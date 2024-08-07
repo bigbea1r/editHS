@@ -34,7 +34,6 @@
 //   });
 // });
 
-
 let editMode = false;
 let animNameCreate = [];
 const modelViewer = document.querySelector("model-viewer");
@@ -56,22 +55,21 @@ const hotspotHighlight = document.getElementById("highlightHotspot");
 const hotspotVisible = document.getElementById("hideHotspot");
 const hotspotRemove = document.getElementById("removeHotspot");
 
-// const colorChange = document.getElementById("colorChangeHotspot");
+const hotspotColorChange = document.getElementById("colorChangeHotspot");
 
 let mainColor = "#FFFFFF";
 
 let doorCondition = false;
 let clickModel = false;
-let onRenameHotspot = false;
-let onMoveHotspot = false;
-let onHightlightHotspot = false;
-let onVisibleHotspot = false;
-let onRemoveHotspot = false;
-let onColorHotspot = false;
+window.onRenameHotspot = false;
+window.onMoveHotspot = false;
+window.onHightlightHotspot = false;
+window.onVisibleHotspot = false;
+window.onRemoveHotspot = false;
+window.onColorHotspot = false;
 
 let intervalId = null;
-let currentHotspot = null; // Хранит текущий hotspot для изменения цвета
-// let originalColor = null;
+let currentHotspot = null;
 
 let visHs = false;
 
@@ -86,49 +84,61 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(button);
   });
 });
-// function switchingLogic(buttonFuc, varLogic){
-//   console.log(1)
-//   buttonFuc.onclick = () => {
-//     console.log(2)
-//     varLogic = !varLogic;
-//     console.log("varLogic =" + varLogic);
-//     contextMenu.style.display = "none";
-//   };
-// }
+//======================================================================
+function resetHotspotFlags(exceptFlag) {
+  const flags = [
+    "onRenameHotspot",
+    "onMoveHotspot",
+    "onHightlightHotspot",
+    "onVisibleHotspot",
+    "onRemoveHotspot",
+  ];
+
+  flags.forEach((flag) => {
+    window[flag] = flag === exceptFlag;
+  });
+}
 //======================================================================
 modelViewer.addEventListener("contextmenu", (event) => {
   event.preventDefault();
-  if (editMode) {
-    const surface = modelViewer.surfaceFromPoint(event.clientX, event.clientY);
-    const newPos = modelViewer.positionAndNormalFromPoint(event.clientX, event.clientY);
-    if (surface !== null) {
-      contextMenu.style.display = "block";
-      contextMenu.setAttribute(
-        "data-position",
-        `${newPos.position.x} ${newPos.position.y} ${newPos.position.z}`
-      );
-      const toggleState = (property) => {
-        window[property] = !window[property];
-        console.log(`${property} = ${window[property]}`);
+
+  if (!editMode) return;
+
+  const surface = modelViewer.surfaceFromPoint(event.clientX, event.clientY);
+  const newPos = modelViewer.positionAndNormalFromPoint(
+    event.clientX,
+    event.clientY
+  );
+
+  if (surface !== null) {
+    contextMenu.style.display = "block";
+    contextMenu.setAttribute(
+      "data-position",
+      `${newPos.position.x} ${newPos.position.y} ${newPos.position.z}`
+    );
+
+    const actions = [
+      {element: hotspotMove, state: "onMoveHotspot"},
+      {element: hotspotRename, state: "onRenameHotspot"},
+      {element: hotspotHighlight, state: "onHightlightHotspot"},
+      {element: hotspotVisible, state: "onVisibleHotspot"},
+      {element: hotspotRemove, state: "onRemoveHotspot"},
+      {element: hotspotColorChange, state: "onColorHotspot"},
+    ];
+    actions.forEach(({ element, state }) => {
+      element.onclick = () => {
+        resetHotspotFlags(state);
         contextMenu.style.display = "none";
       };
-    
-      const buttonActions = {
-        hotspotMove: 'onMoveHotspot',
-        hotspotRename: 'onRenameHotspot',
-        hotspotHighlight: 'onHightlightHotspot',
-        hotspotVisible: 'onVisibleHotspot',
-        hotspotRemove: 'onRemoveHotspot'
-      };
-      // colorChange.onclick = () => {
-      //   onColorHotspot = !onColorHotspot;
-      //   console.log("onColorHotspot =" + onColorHotspot);
-      //   contextMenu.style.display = "none";
-      // };
-      Object.entries(buttonActions).forEach(([buttonId, stateProperty]) => {
-        document.getElementById(buttonId).onclick = () => toggleState(stateProperty);
-      });
-    }
+    });
+
+    // Если требуется добавить код для  hotspotColorChange
+    //  hotspotColorChange.onclick = () => {
+    //   window.onColorHotspot = !window.onColorHotspot;
+    //   console.log("onColorHotspot = " + window.onColorHotspot);
+    //   contextMenu.style.display = "none";
+    // };
+
     clickCreateHS(surface);
   }
 });
@@ -140,10 +150,6 @@ function createHotspot(animationName, surface, text) {
   animNameCreate.push(animationName);
   hotspot.setAttribute("class", "Hotspot");
   hotspot.setAttribute("slot", `hotspot-${animNameCreate.length}`);
-  // hotspot.setAttribute(
-  //   "data-position",
-  //   `${newPos.position.x} ${newPos.position.y} ${newPos.position.z}`
-  // );
   hotspot.setAttribute("data-surface", surface);
   hotspot.setAttribute("data-visibility-attribute", "visible");
   hotspot.setAttribute("data-animation", animationName);
@@ -157,10 +163,10 @@ function createHotspot(animationName, surface, text) {
       doorCondition = !doorCondition;
     } else {
       renameDiv(hotspot, hotspotDiv);
-      hightlightHS(hotspot, hotspotDiv);
-      visibleHS(hotspot, hotspotDiv);
+      visibleHS(hotspot, hotspotDiv); // Сначала переключаем видимость
+      hightlightHS(hotspot); // Затем проверяем мигание
       removeHS(hotspot, hotspotDiv);
-      // colorChangeHS(hotspot);
+      colorChangeHS(hotspot);
     }
   });
   hotspot.addEventListener("mousedown", moveHS);
@@ -169,6 +175,7 @@ function createHotspot(animationName, surface, text) {
 
   saveButtons();
 }
+
 
 //======================================================================
 function clickCreateHS(surface) {
@@ -278,48 +285,35 @@ function renameDiv(hotspot, hotspotDiv) {
 }
 //======================================================================
 function hightlightHS(hotspot) {
-  if (editMode && onHightlightHotspot) {
-      function setButtonColor(color) {
-          hotspot.style.setProperty("--button-color", color);
-      }
-
-      function toggleBlinking() {
-          hotspot.classList.toggle("blink");
-      }
-
-      // Устанавливаем текущий цвет кнопки, который сохранен в CSS переменной
-      const currentColor = getComputedStyle(hotspot).getPropertyValue("--button-color").trim();
-      setButtonColor(currentColor);
-
-      hotspot.addEventListener("click", toggleBlinking);
+  if (editMode && onHightlightHotspot && !hotspot.classList.contains("dimmed")) {
+    const color = getComputedStyle(hotspot).getPropertyValue("--button-color").trim();
+    hotspot.style.setProperty("--button-color", color);
+    hotspot.classList.toggle("blink");
   }
 }
 //======================================================================
-// function colorChangeHS(hotspot) {
-//   if (editMode && onColorHotspot) {
-//     currentHotspot = hotspot;
-//     const pickr = Pickr.get('#color-picker-container');
-//     pickr.show();
-//       // hotspot.style.setProperty("--button-color", "#000000");
-//   }
-// }
+function updateAllHotspots() {
+  document.querySelectorAll(".Hotspot:not(.dimmed)").forEach(hotspot => hightlightHS(hotspot));
+}
+//======================================================================
+function colorChangeHS(hotspot) {
+  if (editMode && onColorHotspot) {
+  //   currentHotspot = hotspot;
+  //   const pickr = Pickr.get('#color-picker-container');
+  //   pickr.show();
+  hotspot.style.setProperty("--button-color", "#000000");
+  }
+}
 //======================================================================
 function visibleHS(hotspot, hotspotDiv) {
-  if (editMode) {
-    if (onVisibleHotspot) {
-      visHs = !visHs;
-      if (visHs) {
-        onHightlightHotspot = false;
-
-        hotspot.classList.add("dimmed");
-        hotspotDiv.classList.add("dimmed");
-      } else {
-        hotspot.classList.remove("dimmed");
-        hotspotDiv.classList.remove("dimmed");
-      }
-    }
+  if (editMode && onVisibleHotspot) {
+    visHs = !visHs;
+    hotspot.classList.toggle("dimmed", visHs);
+    hotspotDiv.classList.toggle("dimmed", visHs);
+    if (!visHs) hightlightHS(hotspot);
   }
 }
+
 //======================================================================
 // Функция удаления тоже не совсем корректно работает с localStorage. нужно удалять конкретный hotspot при включенном флаге и
 function removeHS(hotspot, hotspotDiv) {
@@ -403,9 +397,6 @@ const loadPromises = [
 
 Promise.all(loadPromises).then(() => {
   loader.style.display = "none";
-  // document.querySelectorAll("button").forEach((button) => {
-  //   button.style.display = "block";
-  // });
 });
 
 //         let allHotspot = document.querySelectorAll('.Hotspot')
