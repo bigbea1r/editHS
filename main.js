@@ -1,39 +1,28 @@
-// document.addEventListener('DOMContentLoaded', function() {
-//   // Инициализация Pickr
-//   const pickr = Pickr.create({
-//       el: '#color-picker-container',
-//       theme: 'nano', // можно использовать 'monolith' или 'nano' 'classic'
-//       default: '#ffffff', // начальный цвет
-//       // swatches: [
-//       //     '#000000', '#FF0000', '#00FF00', '#0000FF', // Предустановленные цвета
-//       //     // Добавьте больше цветов, если нужно
-//       // ],
-//       components: {
-//           preview: true,
-//           opacity: true,
-//           hue: true,
-//           interaction: {hex: true, rgb: true, input: true, alpha: true, cancel: true, save: true}
-//       }
-//   });
-
-//   // Обработка выбора цвета
-//   pickr.on('save', (color) => {
-//       const rgbaColor = color.toRGBA(); // Получаем цвет в формате rgba
-//       if (currentHotspot) {
-//           // Устанавливаем выбранный цвет для текущего hotspot
-//           currentHotspot.style.setProperty('--button-color', `rgba(${rgbaColor[0]}, ${rgbaColor[1]}, ${rgbaColor[2]}, ${rgbaColor[3]})`);
-//       }
-//       pickr.hide(); // Скрыть Pickr после выбора цвета
-//   });
-
-//   // Скрыть Pickr при клике вне его
-//   document.addEventListener('click', (event) => {
-//       if (!pickr.getRoot().contains(event.target)) {
-//           pickr.hide();
-//       }
-//   });
-// });
-
+class Hotspot{
+  constructor(){
+  }
+  saveButtons() {
+    const buttons = [];
+    document.querySelectorAll(".Hotspot").forEach((button) => {
+      buttons.push({
+        animation: button.getAttribute("data-animation"),
+        "data-surface": button.getAttribute("data-surface"),
+        text: button.querySelector(".HotspotAnnotation").textContent,
+      });
+    });
+    localStorage.setItem("buttons", JSON.stringify(buttons));
+  }
+  renameHS(hotspot, divName){
+    const buttons = JSON.parse(localStorage.getItem("buttons")) || [];
+    const buttonIndex = Array.from(
+      modelViewer.querySelectorAll(".Hotspot")
+    ).indexOf(hotspot);
+    if (buttonIndex !== -1) {
+      buttons[buttonIndex].text = divName;
+      localStorage.setItem("buttons", JSON.stringify(buttons));
+    }
+  }
+}
 let editMode = false;
 let animNameCreate = [];
 const modelViewer = document.querySelector("model-viewer");
@@ -55,49 +44,37 @@ const hotspotHighlight = document.getElementById("highlightHotspot");
 const hotspotVisible = document.getElementById("hideHotspot");
 const hotspotRemove = document.getElementById("removeHotspot");
 
-const hotspotColorChange = document.getElementById("colorChangeHotspot");
-
-let mainColor = "#FFFFFF";
-
 let doorCondition = false;
 let clickModel = false;
-window.onRenameHotspot = false;
-window.onMoveHotspot = false;
-window.onHightlightHotspot = false;
-window.onVisibleHotspot = false;
-window.onRemoveHotspot = false;
-window.onColorHotspot = false;
+let onMoveHotspot = true;
+let activeHotspotAction = null;
 
-let intervalId = null;
-let currentHotspot = null;
+let hotspotClass = new Hotspot()
 
-let visHs = false;
-
+const actions = [
+  { element: hotspotMove, action: "move" },
+  { element: hotspotRename, action: "rename" },
+  { element: hotspotHighlight, action: "highlight" },
+  { element: hotspotVisible, action: "visible" },
+  { element: hotspotRemove, action: "remove" },
+];
+//======================================================================
 document.addEventListener("DOMContentLoaded", () => {
   const buttons = JSON.parse(localStorage.getItem("buttons")) || [];
   buttons.forEach((button) => {
-    // const position = button.position.split(" ").map(Number);
-    // const newPos = {
-    //   position: { x: position[0], y: position[1], z: position[2] },
-    // };
-    createHotspot(button.animation, button.surface, button.text);
+    createHotspot(button.animation, button["data-surface"], button.text);
     console.log(button);
   });
 });
 //======================================================================
-function resetHotspotFlags(exceptFlag) {
-  const flags = [
-    "onRenameHotspot",
-    "onMoveHotspot",
-    "onHightlightHotspot",
-    "onVisibleHotspot",
-    "onRemoveHotspot",
-  ];
-
-  flags.forEach((flag) => {
-    window[flag] = flag === exceptFlag;
+actions.forEach(({ element, action }) => {
+  element.addEventListener("click", () => {
+    activeHotspotAction = action;
+    resetHotspotFlags();
+    console.log(`Активное действие: ${action}`);
+    contextMenu.style.display = 'none'
   });
-}
+});
 //======================================================================
 modelViewer.addEventListener("contextmenu", (event) => {
   event.preventDefault();
@@ -116,32 +93,10 @@ modelViewer.addEventListener("contextmenu", (event) => {
       "data-position",
       `${newPos.position.x} ${newPos.position.y} ${newPos.position.z}`
     );
-
-    const actions = [
-      {element: hotspotMove, state: "onMoveHotspot"},
-      {element: hotspotRename, state: "onRenameHotspot"},
-      {element: hotspotHighlight, state: "onHightlightHotspot"},
-      {element: hotspotVisible, state: "onVisibleHotspot"},
-      {element: hotspotRemove, state: "onRemoveHotspot"},
-      {element: hotspotColorChange, state: "onColorHotspot"},
-    ];
-    actions.forEach(({ element, state }) => {
-      element.onclick = () => {
-        resetHotspotFlags(state);
-        contextMenu.style.display = "none";
-      };
-    });
-
-    // Если требуется добавить код для  hotspotColorChange
-    //  hotspotColorChange.onclick = () => {
-    //   window.onColorHotspot = !window.onColorHotspot;
-    //   console.log("onColorHotspot = " + window.onColorHotspot);
-    //   contextMenu.style.display = "none";
-    // };
-
     clickCreateHS(surface);
   }
 });
+
 //======================================================================
 function createHotspot(animationName, surface, text) {
   const hotspot = document.createElement("button");
@@ -162,20 +117,34 @@ function createHotspot(animationName, surface, text) {
       playAnimation(animationName, doorCondition ? -1 : 1);
       doorCondition = !doorCondition;
     } else {
-      renameDiv(hotspot, hotspotDiv);
-      visibleHS(hotspot, hotspotDiv); // Сначала переключаем видимость
-      hightlightHS(hotspot); // Затем проверяем мигание
-      removeHS(hotspot, hotspotDiv);
-      colorChangeHS(hotspot);
+      switch (activeHotspotAction) {
+        case "rename":
+          renameDiv(hotspot, hotspotDiv);
+          break;
+        case "move":
+          moveHS(hotspot);
+          onMoveHotspot = !onMoveHotspot
+          break;
+        case "highlight":
+          hightlightHS(hotspot);
+          break;
+        case "visible":
+          visibleHS(hotspot, hotspotDiv);
+          break;
+        case "remove":
+          removeHS(hotspot, hotspotDiv);
+          break;
+        default:
+          console.log("Нет активного действия.");
+      }
     }
   });
   hotspot.addEventListener("mousedown", moveHS);
 
   modelViewer.appendChild(hotspot);
 
-  saveButtons();
+  hotspotClass.saveButtons()
 }
-
 
 //======================================================================
 function clickCreateHS(surface) {
@@ -193,7 +162,7 @@ function clickCreateHS(surface) {
 
         if (anim.trim() !== "" && animName.includes(anim)) {
           createHotspot(anim, surface, divName);
-          saveButtons(surface);
+          hotspotClass.saveButtons()
           outPopup();
         } else {
           outPopup();
@@ -211,135 +180,95 @@ function clickCreateHS(surface) {
   };
 }
 //======================================================================
-
 function moveHS(event) {
-  if (editMode && onMoveHotspot) {
+  if (editMode && window.onMoveHotspot) {
     const hotspot = event.target;
-    const currentSlot = event.target.getAttribute("slot");
-    async function onMouseMove(moveEvent) {
-      // let newPos = modelViewer.positionAndNormalFromPoint(
-      //   moveEvent.clientX,
-      //   moveEvent.clientY
-      // );
+    const currentSlot = hotspot.getAttribute("slot");
+
+    function onMouseMove(moveEvent) {
+      // let newPos = modelViewer.positionAndNormalFromPoint(moveEvent.clientX, moveEvent.clientY);
+
+      // if (!newPos) return;
+
       // const updatedProperties = {
       //   name: currentSlot,
       //   position: `${newPos.position.x} ${newPos.position.y} ${newPos.position.z}`,
       // };
+
       let newSur = modelViewer.surfaceFromPoint(
         moveEvent.clientX,
         moveEvent.clientY
       );
-      // console.log("-----------------------------");
-      // console.log(newSur);
-      await modelViewer.updateComplete;
-      hotspot.setAttribute("data-surface", newSur);
-      const updatedSurface = {
-        name: currentSlot,
-        surface: `${newSur}`,
-      };
-      console.log("-----------------------------");
-      console.log(modelViewer.queryHotspot(currentSlot).position);
-      console.log(modelViewer.queryHotspot(currentSlot).normal);
-      console.log(modelViewer.queryHotspot(currentSlot).canvasPosition);
-      // modelViewer.updateHotspot(updatedProperties);
-      modelViewer.updateHotspot(updatedSurface);
-    }
-    function onMouseUp() {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      saveButtons();
+
+      if (newSur) {
+        // hotspot.setAttribute("data-surface", newSur);
+        const updatedSurface = {
+          name: currentSlot,
+          surface: `${newSur}`,
+        };
+
+        console.log(newSur);
+        // modelViewer.updateHotspot(updatedProperties);
+        modelViewer.updateHotspot(updatedSurface);
+      }
     }
 
     document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
+
+    document.addEventListener(
+      "mouseup",
+      () => {
+        document.removeEventListener("mousemove", onMouseMove);
+      },
+      { once: true }
+    );
   }
 }
-
 //======================================================================
 function renameDiv(hotspot, hotspotDiv) {
-  if (editMode && onRenameHotspot) {
-    containerInput.style.display = "block";
-    divNameInput.value = hotspotDiv.textContent;
-    animationNameInput.style.display = "none";
+  containerInput.style.display = "block";
+  divNameInput.value = hotspotDiv.textContent;
+  animationNameInput.style.display = "none";
 
-    enterButton.addEventListener("click", hsEnter, { once: true });
-    function hsEnter() {
-      if (editMode) {
-        const divName = divNameInput.value;
-        hotspotDiv.textContent = divName;
-        hotspot.appendChild(hotspotDiv);
-        animationNameInput.style.display = "block";
-        outPopup();
-
-        const buttons = JSON.parse(localStorage.getItem("buttons")) || [];
-        const buttonIndex = Array.from(
-          modelViewer.querySelectorAll(".Hotspot")
-        ).indexOf(hotspot);
-        if (buttonIndex !== -1) {
-          buttons[buttonIndex].text = divName;
-          localStorage.setItem("buttons", JSON.stringify(buttons));
-        }
-      }
+  enterButton.addEventListener("click", hsEnter, { once: true });
+  function hsEnter() {
+    if (editMode) {
+      const divName = divNameInput.value;
+      hotspotDiv.textContent = divName;
+      hotspot.appendChild(hotspotDiv);
+      animationNameInput.style.display = "block";
+      outPopup();
+      hotspotClass.renameHS(hotspot, divName)
     }
   }
 }
 //======================================================================
 function hightlightHS(hotspot) {
-  if (editMode && onHightlightHotspot && !hotspot.classList.contains("dimmed")) {
-    const color = getComputedStyle(hotspot).getPropertyValue("--button-color").trim();
+  if (!hotspot.classList.contains("dimmed")) {
+    const color = getComputedStyle(hotspot)
+      .getPropertyValue("--button-color")
+      .trim();
     hotspot.style.setProperty("--button-color", color);
     hotspot.classList.toggle("blink");
   }
 }
 //======================================================================
 function updateAllHotspots() {
-  document.querySelectorAll(".Hotspot:not(.dimmed)").forEach(hotspot => hightlightHS(hotspot));
-}
-//======================================================================
-function colorChangeHS(hotspot) {
-  if (editMode && onColorHotspot) {
-  //   currentHotspot = hotspot;
-  //   const pickr = Pickr.get('#color-picker-container');
-  //   pickr.show();
-  hotspot.style.setProperty("--button-color", "#000000");
-  }
+  document
+    .querySelectorAll(".Hotspot:not(.dimmed)")
+    .forEach((hotspot) => hightlightHS(hotspot));
 }
 //======================================================================
 function visibleHS(hotspot, hotspotDiv) {
-  if (editMode && onVisibleHotspot) {
-    visHs = !visHs;
-    hotspot.classList.toggle("dimmed", visHs);
-    hotspotDiv.classList.toggle("dimmed", visHs);
-    if (!visHs) hightlightHS(hotspot);
-  }
+  const visHs = !hotspot.classList.toggle("dimmed");
+  hotspotDiv.classList.toggle("dimmed");
+  if (!visHs) hightlightHS(hotspot);
 }
-
 //======================================================================
-// Функция удаления тоже не совсем корректно работает с localStorage. нужно удалять конкретный hotspot при включенном флаге и
 function removeHS(hotspot, hotspotDiv) {
-  if (editMode) {
-    if (editMode && onRemoveHotspot) {
-      hotspot.remove();
-      hotspotDiv.remove();
-      let removeButtons = localStorage.getItem("text");
-      console.log(localStorage);
-      console.log(removeButtons);
-    }
-  }
-}
-//======================================================================
-function saveButtons() {
-  const buttons = [];
-  document.querySelectorAll(".Hotspot").forEach((button) => {
-    buttons.push({
-      animation: button.getAttribute("data-animation"),
-      surface: button.getAttribute("data-surface"),
-      // position: button.getAttribute("data-position"),
-      // normal: button.getAttribute("data-normal"),
-      text: button.querySelector(".HotspotAnnotation").textContent,
-    });
-  });
-  localStorage.setItem("buttons", JSON.stringify(buttons));
+  hotspot.remove();
+  hotspotDiv.remove();
+  hotspotClass.saveButtons()
 }
 //======================================================================
 async function playAnimation(anim, timeScale) {
@@ -352,16 +281,22 @@ async function playAnimation(anim, timeScale) {
     pingpong: false,
   });
 }
+
+function resetHotspotFlags() {
+  window.onRenameHotspot = activeHotspotAction === "rename";
+  window.onMoveHotspot = activeHotspotAction === "move";
+  window.onHightlightHotspot = activeHotspotAction === "highlight";
+  window.onVisibleHotspot = activeHotspotAction === "visible";
+  window.onRemoveHotspot = activeHotspotAction === "remove";
+}
+
 editButton.addEventListener("click", (event) => {
   event.stopPropagation();
   editMode = !editMode;
   if (editMode) {
     clickModel = false;
-    onRenameHotspot = false;
-    onMoveHotspot = false;
-    onHightlightHotspot = false;
-    onVisibleHotspot = false;
-    onRemoveHotspot = false;
+    activeHotspotAction = null;
+    resetHotspotFlags();
   }
   if (editMode) {
     popupOn.style.display = "block";
@@ -375,6 +310,7 @@ editButton.addEventListener("click", (event) => {
     }, 1000);
   }
 });
+
 cancelButton.addEventListener("click", outPopup);
 
 function outPopup() {
@@ -398,7 +334,6 @@ const loadPromises = [
 Promise.all(loadPromises).then(() => {
   loader.style.display = "none";
 });
-
 //         let allHotspot = document.querySelectorAll('.Hotspot')
 
 //         allHotspot.forEach(hotspot => {
