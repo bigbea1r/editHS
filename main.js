@@ -5,9 +5,9 @@ class Hotspot{
     const buttons = [];
     document.querySelectorAll(".Hotspot").forEach((button) => {
       buttons.push({
-        animation: button.getAttribute("data-animation"),
-        "data-surface": button.getAttribute("data-surface"),
         text: button.querySelector(".HotspotAnnotation").textContent,
+        animation: button.getAttribute("data-animation"),
+        data_surface: button.getAttribute("data-surface"),
       });
     });
     localStorage.setItem("buttons", JSON.stringify(buttons));
@@ -20,6 +20,7 @@ class Hotspot{
     if (buttonIndex !== -1) {
       buttons[buttonIndex].text = divName;
       localStorage.setItem("buttons", JSON.stringify(buttons));
+      console.log(buttons)
     }
   }
 }
@@ -62,7 +63,7 @@ const actions = [
 document.addEventListener("DOMContentLoaded", () => {
   const buttons = JSON.parse(localStorage.getItem("buttons")) || [];
   buttons.forEach((button) => {
-    createHotspot(button.animation, button["data-surface"], button.text);
+    createHotspot(button.text, button.animation, button.data_surface);
     console.log(button);
   });
 });
@@ -75,6 +76,11 @@ actions.forEach(({ element, action }) => {
     contextMenu.style.display = 'none'
   });
 });
+//======================================================================
+function setupEnterButton(enterButton, handleClick){
+  enterButton.removeEventListener('click', handleClick)
+  enterButton.addEventListener('click', handleClick, {once: true})
+}
 //======================================================================
 modelViewer.addEventListener("contextmenu", (event) => {
   event.preventDefault();
@@ -96,9 +102,11 @@ modelViewer.addEventListener("contextmenu", (event) => {
     clickCreateHS(surface);
   }
 });
+setTimeout(()=>{ console.log(modelViewer.animationName)
+  console.log(modelViewer.availableAnimations)}, 5000)
 
 //======================================================================
-function createHotspot(animationName, surface, text) {
+function createHotspot(text, animationName, surface) {
   const hotspot = document.createElement("button");
   const hotspotDiv = document.createElement("div");
 
@@ -116,6 +124,11 @@ function createHotspot(animationName, surface, text) {
     if (!editMode) {
       playAnimation(animationName, doorCondition ? -1 : 1);
       doorCondition = !doorCondition;
+      
+      console.log(modelViewer.animationName)
+      console.log(modelViewer.availableAnimations)
+      // console.log(mode)
+
     } else {
       switch (activeHotspotAction) {
         case "rename":
@@ -145,7 +158,6 @@ function createHotspot(animationName, surface, text) {
 
   hotspotClass.saveButtons()
 }
-
 //======================================================================
 function clickCreateHS(surface) {
   hotspotCreate.onclick = () => {
@@ -153,7 +165,6 @@ function clickCreateHS(surface) {
 
     if (surface && clickModel) {
       containerInput.style.display = "block";
-      enterButton.removeEventListener("click", handleEnterClick);
 
       function handleEnterClick() {
         const divName = divNameInput.value;
@@ -161,7 +172,7 @@ function clickCreateHS(surface) {
         const animName = modelViewer.availableAnimations;
 
         if (anim.trim() !== "" && animName.includes(anim)) {
-          createHotspot(anim, surface, divName);
+          createHotspot(divName, anim, surface);
           hotspotClass.saveButtons()
           outPopup();
         } else {
@@ -172,10 +183,7 @@ function clickCreateHS(surface) {
           }, 1500);
         }
       }
-
-      enterButton.addEventListener("click", handleEnterClick, {
-        once: true,
-      });
+      setupEnterButton(enterButton, handleEnterClick)
     }
   };
 }
@@ -230,7 +238,8 @@ function renameDiv(hotspot, hotspotDiv) {
   divNameInput.value = hotspotDiv.textContent;
   animationNameInput.style.display = "none";
 
-  enterButton.addEventListener("click", hsEnter, { once: true });
+  setupEnterButton(enterButton, hsEnter)
+
   function hsEnter() {
     if (editMode) {
       const divName = divNameInput.value;
@@ -251,12 +260,6 @@ function hightlightHS(hotspot) {
     hotspot.style.setProperty("--button-color", color);
     hotspot.classList.toggle("blink");
   }
-}
-//======================================================================
-function updateAllHotspots() {
-  document
-    .querySelectorAll(".Hotspot:not(.dimmed)")
-    .forEach((hotspot) => hightlightHS(hotspot));
 }
 //======================================================================
 function visibleHS(hotspot, hotspotDiv) {
