@@ -1,29 +1,54 @@
-class Hotspot{
-  constructor(){
-  }
-  saveButtons() {
-    const buttons = [];
-    document.querySelectorAll(".Hotspot").forEach((button) => {
-      buttons.push({
-        text: button.querySelector(".HotspotAnnotation").textContent,
-        animation: button.getAttribute("data-animation"),
-        data_surface: button.getAttribute("data-surface"),
-      });
-    });
-    localStorage.setItem("buttons", JSON.stringify(buttons));
-  }
-  renameHS(hotspot, divName){
-    const buttons = JSON.parse(localStorage.getItem("buttons")) || [];
-    const buttonIndex = Array.from(
-      modelViewer.querySelectorAll(".Hotspot")
-    ).indexOf(hotspot);
-    if (buttonIndex !== -1) {
-      buttons[buttonIndex].text = divName;
-      localStorage.setItem("buttons", JSON.stringify(buttons));
-      console.log(buttons)
-    }
+// MOdel
+class Hotspot {
+  constructor(name, animation, data_surface) {
+    this.name = name;
+    this.animation = animation;
+    this.data_surface = data_surface;
   }
 }
+
+class HotspotList {
+  constructor() {
+    this.hotspots = [];
+  }
+
+  add(hotspot, shouldSave = true) {
+    this.hotspots.push(hotspot);
+    if (shouldSave) {
+      this.saveHotspots();
+    }
+  }
+
+  remove(name) {
+    this.hotspots = this.hotspots.filter((hs) => hs.name !== name);
+    this.saveHotspots();
+  }
+
+  getByName(name) {
+    return this.hotspots.find((hs) => hs.name === name);
+  }
+
+  setByName(oldName, newName) {
+    const hotspot = this.getByName(oldName);
+    if (hotspot) {
+      hotspot.name = newName;
+      this.saveHotspots();
+    }
+  }
+
+  saveHotspots() {
+    localStorage.setItem("hotspots", JSON.stringify(this.hotspots));
+  }
+
+  loadHotspots() {
+    const loadedHotspots = JSON.parse(localStorage.getItem("hotspots")) || [];
+    this.hotspots = loadedHotspots.map(
+      (hs) => new Hotspot(hs.name, hs.animation, hs.data_surface)
+    );
+    console.log(this.hotspots);
+  }
+}
+
 let editMode = false;
 let animNameCreate = [];
 const modelViewer = document.querySelector("model-viewer");
@@ -50,7 +75,8 @@ let clickModel = false;
 let onMoveHotspot = true;
 let activeHotspotAction = null;
 
-let hotspotClass = new Hotspot()
+const hotspotList = new HotspotList();
+hotspotList.loadHotspots();
 
 const actions = [
   { element: hotspotMove, action: "move" },
@@ -59,29 +85,99 @@ const actions = [
   { element: hotspotVisible, action: "visible" },
   { element: hotspotRemove, action: "remove" },
 ];
-//======================================================================
+
+// View
+function displayNone(elem) {
+  elem.style.display = "none";
+}
+function displayBlock(elem) {
+  elem.style.display = "block";
+}
+editButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  editMode = !editMode;
+  if (editMode) {
+    clickModel = false;
+    activeHotspotAction = null;
+    resetHotspotFlags();
+  }
+  if (editMode) {
+    displayBlock(popupOn);
+    setTimeout(() => {
+      displayNone(popupOn);
+    }, 1500);
+  } else {
+    displayBlock(popupOff);
+    setTimeout(() => {
+      displayNone(popupOff);
+    }, 1000);
+  }
+});
+
+function outPopup() {
+  divNameInput.value = "";
+  animationNameInput.value = "";
+  displayNone(containerInput);
+  displayNone(contextMenu);
+}
+
+const loadPromises = [
+  new Promise((resolve, reject) => {
+    modelViewer.addEventListener("load", () => {
+      resolve();
+    });
+    modelViewer.addEventListener("error", (error) => {
+      reject(error);
+    });
+  }),
+];
+
+Promise.all(loadPromises).then(() => {
+  displayNone(loader);
+});
+// ---------------------------------------------------------------
+
+function createHotspotElement(text, animationName, surface) {
+  const hotspotElement = document.createElement("button");
+  const hotspotDiv = document.createElement("div");
+
+  animNameCreate.push(animationName);
+  hotspotElement.setAttribute("class", "Hotspot");
+  hotspotElement.setAttribute("slot", `hotspot-${animNameCreate.length}`);
+  hotspotElement.setAttribute("data-surface", surface);
+  hotspotElement.setAttribute("data-visibility-attribute", "visible");
+  hotspotElement.setAttribute("data-animation", animationName);
+  hotspotDiv.setAttribute("class", "HotspotAnnotation");
+  hotspotDiv.textContent = text;
+  hotspotElement.appendChild(hotspotDiv);
+
+  return hotspotElement;
+}
+
+
+//Control
 document.addEventListener("DOMContentLoaded", () => {
-  const buttons = JSON.parse(localStorage.getItem("buttons")) || [];
-  buttons.forEach((button) => {
-    createHotspot(button.text, button.animation, button.data_surface);
-    console.log(button);
+  hotspotList.hotspots.forEach((hotspot) => {
+    createHotspot(hotspot.name, hotspot.animation, hotspot.data_surface, false);
   });
 });
-//======================================================================
+
 actions.forEach(({ element, action }) => {
   element.addEventListener("click", () => {
     activeHotspotAction = action;
     resetHotspotFlags();
     console.log(`Активное действие: ${action}`);
-    contextMenu.style.display = 'none'
+    displayNone(contextMenu);
   });
 });
-//======================================================================
-function setupEnterButton(enterButton, handleClick){
-  enterButton.removeEventListener('click', handleClick)
-  enterButton.addEventListener('click', handleClick, {once: true})
+
+function setupEnterButton(enterButton, handleClick) {
+  enterButton.removeEventListener("click", handleClick);
+  enterButton.addEventListener("click", handleClick, { once: true });
 }
-//======================================================================
+
+cancelButton.addEventListener("click", outPopup);
+
 modelViewer.addEventListener("contextmenu", (event) => {
   event.preventDefault();
 
@@ -94,7 +190,7 @@ modelViewer.addEventListener("contextmenu", (event) => {
   );
 
   if (surface !== null) {
-    contextMenu.style.display = "block";
+    displayBlock(contextMenu);
     contextMenu.setAttribute(
       "data-position",
       `${newPos.position.x} ${newPos.position.y} ${newPos.position.z}`
@@ -102,69 +198,54 @@ modelViewer.addEventListener("contextmenu", (event) => {
     clickCreateHS(surface);
   }
 });
-setTimeout(()=>{ console.log(modelViewer.animationName)
-  console.log(modelViewer.availableAnimations)}, 5000)
 
-//======================================================================
-function createHotspot(text, animationName, surface) {
-  const hotspot = document.createElement("button");
-  const hotspotDiv = document.createElement("div");
+function createHotspot(text, animationName, surface, shouldSave = true) {
+  const hotspotElement = createHotspotElement(text, animationName, surface);
 
-  animNameCreate.push(animationName);
-  hotspot.setAttribute("class", "Hotspot");
-  hotspot.setAttribute("slot", `hotspot-${animNameCreate.length}`);
-  hotspot.setAttribute("data-surface", surface);
-  hotspot.setAttribute("data-visibility-attribute", "visible");
-  hotspot.setAttribute("data-animation", animationName);
-  hotspotDiv.setAttribute("class", "HotspotAnnotation");
-  hotspotDiv.textContent = text;
-  hotspot.appendChild(hotspotDiv);
-
-  hotspot.addEventListener("click", async () => {
+  hotspotElement.addEventListener("click", async () => {
     if (!editMode) {
       playAnimation(animationName, doorCondition ? -1 : 1);
       doorCondition = !doorCondition;
-      
-      console.log(modelViewer.animationName)
-      console.log(modelViewer.availableAnimations)
-      // console.log(mode)
-
     } else {
       switch (activeHotspotAction) {
         case "rename":
-          renameDiv(hotspot, hotspotDiv);
+          renameDiv(hotspotElement, hotspotElement.querySelector(".HotspotAnnotation"));
           break;
         case "move":
-          moveHS(hotspot);
-          onMoveHotspot = !onMoveHotspot
+          moveHS(hotspotElement);
+          onMoveHotspot = !onMoveHotspot;
           break;
         case "highlight":
-          hightlightHS(hotspot);
+          hightlightHS(hotspotElement);
           break;
         case "visible":
-          visibleHS(hotspot, hotspotDiv);
+          visibleHS(hotspotElement, hotspotElement.querySelector(".HotspotAnnotation"));
           break;
         case "remove":
-          removeHS(hotspot, hotspotDiv);
+          removeHS(hotspotElement, hotspotElement.querySelector(".HotspotAnnotation"));
           break;
         default:
           console.log("Нет активного действия.");
       }
     }
   });
-  hotspot.addEventListener("mousedown", moveHS);
+  
+  hotspotElement.addEventListener("mousedown", moveHS);
 
-  modelViewer.appendChild(hotspot);
+  modelViewer.appendChild(hotspotElement);
 
-  hotspotClass.saveButtons()
+  if (shouldSave) {
+    const hotspot = new Hotspot(text, animationName, surface);
+    hotspotList.add(hotspot, shouldSave);
+  }
 }
-//======================================================================
+
 function clickCreateHS(surface) {
   hotspotCreate.onclick = () => {
     clickModel = !clickModel;
 
     if (surface && clickModel) {
-      containerInput.style.display = "block";
+      displayBlock(containerInput);
 
       function handleEnterClick() {
         const divName = divNameInput.value;
@@ -173,107 +254,92 @@ function clickCreateHS(surface) {
 
         if (anim.trim() !== "" && animName.includes(anim)) {
           createHotspot(divName, anim, surface);
-          hotspotClass.saveButtons()
           outPopup();
         } else {
           outPopup();
-          popupError.style.display = "block";
+          displayBlock(popupError);
+
           setTimeout(() => {
-            popupError.style.display = "none";
+            displayNone(popupError);
           }, 1500);
         }
       }
-      setupEnterButton(enterButton, handleEnterClick)
+      setupEnterButton(enterButton, handleEnterClick);
     }
   };
 }
-//======================================================================
+
 function moveHS(event) {
   if (editMode && window.onMoveHotspot) {
-    const hotspot = event.target;
-    const currentSlot = hotspot.getAttribute("slot");
+    const hotspotElement = event.target;
+    const currentSlot = hotspotElement.getAttribute("slot");
 
     function onMouseMove(moveEvent) {
-      // let newPos = modelViewer.positionAndNormalFromPoint(moveEvent.clientX, moveEvent.clientY);
-
-      // if (!newPos) return;
-
-      // const updatedProperties = {
-      //   name: currentSlot,
-      //   position: `${newPos.position.x} ${newPos.position.y} ${newPos.position.z}`,
-      // };
-
       let newSur = modelViewer.surfaceFromPoint(
         moveEvent.clientX,
         moveEvent.clientY
       );
 
       if (newSur) {
-        // hotspot.setAttribute("data-surface", newSur);
         const updatedSurface = {
           name: currentSlot,
           surface: `${newSur}`,
         };
-
         console.log(newSur);
-        // modelViewer.updateHotspot(updatedProperties);
+
         modelViewer.updateHotspot(updatedSurface);
       }
     }
 
     document.addEventListener("mousemove", onMouseMove);
 
-    document.addEventListener(
-      "mouseup",
-      () => {
-        document.removeEventListener("mousemove", onMouseMove);
-      },
-      { once: true }
-    );
+    document.addEventListener("mouseup", () => {document.removeEventListener("mousemove", onMouseMove)},{ once: true });
   }
 }
-//======================================================================
-function renameDiv(hotspot, hotspotDiv) {
-  containerInput.style.display = "block";
-  divNameInput.value = hotspotDiv.textContent;
-  animationNameInput.style.display = "none";
 
-  setupEnterButton(enterButton, hsEnter)
+function renameDiv(hotspotElement, hotspotDiv, shouldSave = true) {
+  displayBlock(containerInput);
+  divNameInput.value = hotspotDiv.textContent;
+  displayNone(animationNameInput);
+
+  setupEnterButton(enterButton, hsEnter);
 
   function hsEnter() {
     if (editMode) {
-      const divName = divNameInput.value;
-      hotspotDiv.textContent = divName;
-      hotspot.appendChild(hotspotDiv);
-      animationNameInput.style.display = "block";
+      const oldName = hotspotDiv.textContent;
+      const newName = divNameInput.value;
+      hotspotDiv.textContent = newName;
+      hotspotElement.appendChild(hotspotDiv);
+      displayBlock(animationNameInput);
       outPopup();
-      hotspotClass.renameHS(hotspot, divName)
+      hotspotList.setByName(oldName, newName, shouldSave);
     }
   }
 }
-//======================================================================
-function hightlightHS(hotspot) {
-  if (!hotspot.classList.contains("dimmed")) {
-    const color = getComputedStyle(hotspot)
+
+function hightlightHS(hotspotElement) {
+  if (!hotspotElement.classList.contains("dimmed")) {
+    const color = getComputedStyle(hotspotElement)
       .getPropertyValue("--button-color")
       .trim();
-    hotspot.style.setProperty("--button-color", color);
-    hotspot.classList.toggle("blink");
+    hotspotElement.style.setProperty("--button-color", color);
+    hotspotElement.classList.toggle("blink");
   }
 }
-//======================================================================
-function visibleHS(hotspot, hotspotDiv) {
-  const visHs = !hotspot.classList.toggle("dimmed");
+
+function visibleHS(hotspotElement, hotspotDiv) {
+  const visHs = !hotspotElement.classList.toggle("dimmed");
   hotspotDiv.classList.toggle("dimmed");
-  if (!visHs) hightlightHS(hotspot);
+  if (!visHs) hightlightHS(hotspotElement);
 }
-//======================================================================
-function removeHS(hotspot, hotspotDiv) {
-  hotspot.remove();
+
+function removeHS(hotspotElement, hotspotDiv) {
+  const name = hotspotDiv.textContent;
+  hotspotElement.remove();
   hotspotDiv.remove();
-  hotspotClass.saveButtons()
+  hotspotList.remove(name);
 }
-//======================================================================
+
 async function playAnimation(anim, timeScale) {
   modelViewer.animationName = anim;
   modelViewer.timeScale = timeScale;
@@ -293,50 +359,6 @@ function resetHotspotFlags() {
   window.onRemoveHotspot = activeHotspotAction === "remove";
 }
 
-editButton.addEventListener("click", (event) => {
-  event.stopPropagation();
-  editMode = !editMode;
-  if (editMode) {
-    clickModel = false;
-    activeHotspotAction = null;
-    resetHotspotFlags();
-  }
-  if (editMode) {
-    popupOn.style.display = "block";
-    setTimeout(() => {
-      popupOn.style.display = "none";
-    }, 1500);
-  } else {
-    popupOff.style.display = "block";
-    setTimeout(() => {
-      popupOff.style.display = "none";
-    }, 1000);
-  }
-});
-
-cancelButton.addEventListener("click", outPopup);
-
-function outPopup() {
-  divNameInput.value = "";
-  animationNameInput.value = "";
-  containerInput.style.display = "none";
-  contextMenu.style.display = "none";
-}
-// ------------------------Анимация загрузки-------------------------
-const loadPromises = [
-  new Promise((resolve, reject) => {
-    modelViewer.addEventListener("load", () => {
-      resolve();
-    });
-    modelViewer.addEventListener("error", (error) => {
-      reject(error);
-    });
-  }),
-];
-
-Promise.all(loadPromises).then(() => {
-  loader.style.display = "none";
-});
 //         let allHotspot = document.querySelectorAll('.Hotspot')
 
 //         allHotspot.forEach(hotspot => {
