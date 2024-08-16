@@ -1,76 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>Ебать холодос</title>
+    <title>Холодос</title>
     <meta charset="utf-8" />
     <meta name="description" content="&lt;model-viewer&gt; template" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link type="text/css" href="./styles.css" rel="stylesheet" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="shortcut icon" href="https://static.tildacdn.com/tild3035-3732-4336-a463-343563343832/f1.ico" type="image/x-icon"/>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet"/>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.8.0/dist/themes/classic.min.css" />
+    <link
+      rel="shortcut icon"
+      href="https://static.tildacdn.com/tild3035-3732-4336-a463-343563343832/f1.ico"
+      type="image/x-icon"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.8.0/dist/themes/classic.min.css"
+    />
+
+    <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.8.0/dist/pickr.min.js"></script>
+    <!-- <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script> -->
+    <script src="https://api.zarbo.tech/viewer/js/viewer.js"></script>
+    <link
+      href="https://api.zarbo.tech/viewer/css/style.min.css"
+      rel="stylesheet"
+    />
+    <script type="module" defer src="./main.js"></script>
   </head>
   <body>
-    <div class="loader-container" id="loader">
-      <div class="loader"></div>
-    </div>
-    <model-viewer
-      oncontextmenu="event.preventDefault();"
-      src="new_holodos.glb"
-      id="holodos"
-      ar
-      ar-modes="webxr scene-viewer quick-look"
-      camera-controls
-      tone-mapping="neutral"
-      poster="poster.webp"
-      shadow-intensity="1"
-    >
-    <button id="edit_button">Режим редактирования точек</button>
-    <div id="popupOn">
-      Вы вошли в режим размещения точек<br />Размести точки на модели для
-      проигрывания анимации!
-    </div>
-    <div id="popupOff">Вы вышли из режима размещения точек</div>
+    <div class="zarbo_widget">
+      <button id="edit_button">Режим редактирования точек</button>
+      <div id="popupOn">
+        Вы вошли в режим размещения точек<br />Размести точки на модели для
+        проигрывания анимации!
+      </div>
+      <div id="popupOff">Вы вышли из режима размещения точек</div>
 
-    <div id="containerInput">
-      <p>Введите названия</p>
-      <input
-        type="text"
-        id="divNameInput"
-        placeholder="Введите название для Hotspot"
-      />
-      <input
-        type="text"
-        id="animationNameInput"
-        placeholder="Введите название анимации"
-      />
-      <button id="enter">Ввести названия</button>
-      <button id="cancel">cancel</button>
-    </div>
-    <div id="color-picker-container"></div>
-    <div id="contextMenu">
-      <button id="createHotspot">Создать</button>
-      <button id="moveHotspot">Переместить</button>
-      <button id="renameHotspot">Переименовать</button>
-      <button id="highlightHotspot">Подсветить</button>
-      <button id="hideHotspot">Скрыть</button>
-      <button id="removeHotspot">Удалить</button>
-    </div>
+      <div id="containerInput">
+        <p>Введите названия</p>
+        <input
+          type="text"
+          id="divNameInput"
+          placeholder="Введите название для Hotspot"
+        />
+        <input
+          type="text"
+          id="animationNameInput"
+          placeholder="Введите название анимации"
+        />
+        <button id="enter">Ввести названия</button>
+        <button id="cancel">cancel</button>
+      </div>
+      <div id="color-picker-container"></div>
+      <div id="contextMenu">
+        <button id="createHotspot">Создать</button>
+        <button id="moveHotspot">Переместить</button>
+        <button id="renameHotspot">Переименовать</button>
+        <button id="highlightHotspot">Подсветить</button>
+        <button id="hideHotspot">Скрыть</button>
+        <button id="removeHotspot">Удалить</button>
+      </div>
 
-    <div id="popupError">Вы ввели не верное название анимации</div>
-
-    <div class="progress-bar hide" slot="progress-bar">
-      <div class="update-bar"></div>
+      <div id="popupError">Вы ввели не верное название анимации</div>
     </div>
-    <button slot="ar-button" id="ar-button">View in your space</button>
-    <div id="ar-prompt">
-      <img src="ar_hand_prompt.png" />
-    </div>
-  </model-viewer>
-  <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr@1.8.0/dist/pickr.min.js"></script>
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
-  <script type="module" src="./main.js"></script>
-</body>
+  </body>
 </html>

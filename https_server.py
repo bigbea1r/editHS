@@ -1,7 +1,7 @@
 import http.server
 import ssl
 
-server_address = ('', 8668)
+server_address = ('', 8080)
 httpd = http.server.HTTPServer(server_address, http.server.SimpleHTTPRequestHandler)
 
 # Укажите путь к вашему сертификату и ключу
@@ -15,5 +15,5 @@ context.load_cert_chain(certfile=certfile, keyfile=keyfile)
 # Обертывание сокета
 httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
 
-print("Serving on https://192.168.2.102:8668")
+print("Serving on https://192.168.2.102:8080")
 httpd.serve_forever()
