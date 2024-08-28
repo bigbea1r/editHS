@@ -1,0 +1,13 @@
+{
+  "arbtn_position": "bottom",
+  "arbtn_title": "Примерить",
+  "arbtn_subtitle": "",
+  "background_color": "rgba(0,0,0,0)",
+  "change_material": false,
+  "hdri": null,
+  "hdri_as_background": false,
+  "qr_color": "black",
+  "qr_rounded": false,
+  "qr_image": false,
+  "url": "https://zarbo.tech"
+}

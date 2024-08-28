@@ -1,57 +1,79 @@
 (async function initialize() {
-  const ZV = new ZarboViewer('.zarbo_widget', '49b7a8e2-994b-4a51-af7a-e2af12aa738c', 'https://api-release36v2.zarbo.works');
+  const ZV = new ZarboViewer(
+    ".zarbo_widget",
+    "8f047adf-933f-4821-9aa6-9b24cb4bdd91",
+    "https://api-foroleg.zarbo.works"
+  );
   await ZV.init();
 
   class Hotspot {
     constructor(name, animation, data_surface) {
-      this.name = name;
+      this._name = name;
       this.animation = animation;
       this.data_surface = data_surface;
+      this.block = document.createElement("div");
+      this.block.innerHTML = this._name;
+      this.eventNewName = new Event("new-name", {
+        bubbles: true,
+        cancelable: true,
+      });
+    }
+    set name(newName) {
+      this._name = newName;
+      this.block.innerHTML = this._name;
+      this.block.dispatchEvent(this.eventNewName);
+    }
+    get name() {
+      return this._name;
     }
   }
-
   class HotspotList {
     constructor() {
       this.hotspots = [];
     }
 
     add(hotspot, shouldSave = true) {
+      console.log("add");
 
       this.hotspots.push(hotspot);
-      if (shouldSave) {
 
+      hotspot.block.addEventListener("new-name", (event) => {
+        console.log(`Name changed to: ${hotspot.name}`);
+      });
+      if (shouldSave) {
         this.saveHotspots();
       }
     }
 
     remove(name) {
+      console.log("--------------remove--------------");
       this.hotspots = this.hotspots.filter((hs) => hs.name !== name);
       this.saveHotspots();
     }
 
-    getByName(name) {
-      return this.hotspots.find((hs) => hs.name === name);
-    }
-
-    setByName(oldName, newName) {
-      const hotspot = this.getByName(oldName);
-      if (hotspot) {
-        hotspot.name = newName;
-        this.saveHotspots();
-      }
-    }
-
     saveHotspots() {
-      localStorage.setItem("hotspots", JSON.stringify(this.hotspots));
+      console.log("save");
+      localStorage.setItem(
+        "hotspots",
+        JSON.stringify(
+          this.hotspots.map((hs) => ({
+            name: hs.name,
+            animation: hs.animation,
+            data_surface: hs.data_surface
+          }))
+        )
+      );
     }
 
     loadHotspots() {
       const loadedHotspots = JSON.parse(localStorage.getItem("hotspots")) || [];
-      this.hotspots = loadedHotspots.map(
-        (hs) => new Hotspot(hs.name, hs.animation, hs.data_surface)
-      );
-      console.log(localStorage)
-      console.log(loadedHotspots)
+      this.hotspots = loadedHotspots.map((hs) => {
+        const hotspot = new Hotspot(hs.name, hs.animation, hs.data_surface);
+        this.add(hotspot, false);
+        return hotspot;
+      });
+      console.log(localStorage);
+      console.log(loadedHotspots);
     }
   }
 
@@ -147,7 +169,12 @@
 
   ZV.widget.addEventListener("load", () => {
     hotspotList.hotspots.forEach((hotspot) => {
-      createHotspot(hotspot.name, hotspot.animation, hotspot.data_surface, false);
+      createHotspot(
+        hotspot.name,
+        hotspot.animation,
+        hotspot.data_surface,
+        false
+      );
     });
   });
   actions.forEach(({ element, action }) => {
@@ -195,7 +222,10 @@
       } else {
         switch (activeHotspotAction) {
           case "rename":
-            renameDiv(hotspotElement, hotspotElement.querySelector(".HotspotAnnotation"));
+            renameDiv(
+              hotspotElement,
+              hotspotElement.querySelector(".HotspotAnnotation")
+            );
             break;
           case "move":
             moveHS(hotspotElement);
@@ -205,10 +235,16 @@
             hightlightHS(hotspotElement);
             break;
           case "visible":
-            visibleHS(hotspotElement, hotspotElement.querySelector(".HotspotAnnotation"));
+            visibleHS(
+              hotspotElement,
+              hotspotElement.querySelector(".HotspotAnnotation")
+            );
             break;
           case "remove":
-            removeHS(hotspotElement, hotspotElement.querySelector(".HotspotAnnotation"));
+            removeHS(
+              hotspotElement,
+              hotspotElement.querySelector(".HotspotAnnotation")
+            );
             break;
           default:
             console.log("Нет активного действия.");
@@ -288,24 +324,24 @@
     }
   }
 
-  function renameDiv(hotspotElement, hotspotDiv, shouldSave = true) {
+  function renameDiv(hotspotElement, hotspotAnnotation) {
     displayBlock(containerInput);
-    divNameInput.value = hotspotDiv.textContent;
     displayNone(animationNameInput);
-
-    setupEnterButton(enterButton, hsEnter);
-
-    function hsEnter() {
-      if (editMode) {
-        const oldName = hotspotDiv.textContent;
-        const newName = divNameInput.value;
-        hotspotDiv.textContent = newName;
-        hotspotElement.appendChild(hotspotDiv);
-        displayBlock(animationNameInput);
-        outPopup();
-        hotspotList.setByName(oldName, newName, shouldSave);
+    setupEnterButton(enterButton, ()=>{
+      const newName = divNameInput.value.trim();
+      if (newName){
+        hotspotAnnotation.textContent = newName;
+        hotspotElement.appendChild(hotspotAnnotation);
+        const hs = hotspotList.hotspots.find(
+          (hs) => hs.animation === hotspotElement.dataset.animation
+        );
+        if(hs){
+          hs.name = newName;
+          hotspotList.saveHotspots()
+        }
+        outPopup()
       }
-    }
+    })
   }
 
   function hightlightHS(hotspotElement) {
