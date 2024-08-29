@@ -18,64 +18,89 @@
         cancelable: true,
       });
     }
+
     set name(newName) {
       this._name = newName;
       this.block.innerHTML = this._name;
       this.block.dispatchEvent(this.eventNewName);
     }
+
     get name() {
       return this._name;
     }
   }
-  class HotspotList {
-    constructor() {
-      this.hotspots = [];
-    }
 
-    add(hotspot, shouldSave = true) {
-      console.log("add");
+class HotspotList {
+  constructor() {
+    this.hotspots = [];
+  }
 
-      this.hotspots.push(hotspot);
+  add(hotspot, shouldSave = true) {
+    this.hotspots.push(hotspot);
 
-      hotspot.block.addEventListener("new-name", (event) => {
-        console.log(`Name changed to: ${hotspot.name}`);
-      });
-      if (shouldSave) {
-        this.saveHotspots();
-      }
-    }
+    this.addToInfoForm(hotspot);
 
-    remove(name) {
-      console.log("--------------remove--------------");
-      this.hotspots = this.hotspots.filter((hs) => hs.name !== name);
+    hotspot.block.addEventListener("new-name", (event) => {
+      console.log(`Name changed to: ${hotspot.name}`);
+      this.updateInfoFormItem(hotspot);
+    });
+
+    if (shouldSave) {
       this.saveHotspots();
     }
+  }
 
-    saveHotspots() {
-      console.log("save");
-      localStorage.setItem(
-        "hotspots",
-        JSON.stringify(
-          this.hotspots.map((hs) => ({
-            name: hs.name,
-            animation: hs.animation,
-            data_surface: hs.data_surface
-          }))
-        )
-      );
-    }
-
-    loadHotspots() {
-      const loadedHotspots = JSON.parse(localStorage.getItem("hotspots")) || [];
-      this.hotspots = loadedHotspots.map((hs) => {
-        const hotspot = new Hotspot(hs.name, hs.animation, hs.data_surface);
-        this.add(hotspot, false);
-        return hotspot;
-      });
-      console.log(localStorage);
-      console.log(loadedHotspots);
+  remove(name) {
+    const hotspot = this.hotspots.find((hs) => hs.name === name);
+    if (hotspot) {
+      this.hotspots = this.hotspots.filter((hs) => hs.name !== name);
+      this.removeFromInfoForm(hotspot);
+      console.log(this.hotspots);
+      this.saveHotspots();
     }
   }
+  addToInfoForm(hotspot) {
+    const item = this.createInfoFormItem(hotspot);
+    infoForm.appendChild(item);
+  }
+  createInfoFormItem(hotspot) {
+    const item = document.createElement("div");
+    item.className = "info-form-item";
+    item.textContent = `${hotspot.name}, ${hotspot.animation}, ${hotspot.data_surface}`;
+    hotspot.infoFormItem = item;
+    return item;
+  }
+  updateInfoFormItem(hotspot) {
+    if (hotspot.infoFormItem) {
+      hotspot.infoFormItem.textContent = `${hotspot.name}, ${hotspot.animation}, ${hotspot.data_surface}`;
+    }
+  }
+  removeFromInfoForm(hotspot) {
+    if (hotspot.infoFormItem && hotspot.infoFormItem.parentNode) {
+      hotspot.infoFormItem.parentNode.removeChild(hotspot.infoFormItem);
+    }
+  }
+  saveHotspots() {
+    localStorage.setItem(
+      "hotspots",
+      JSON.stringify(
+        this.hotspots.map((hs) => ({
+          name: hs.name,
+          animation: hs.animation,
+          data_surface: hs.data_surface,
+        }))
+      )
+    );
+  }
+  loadHotspots() {
+    const loadedHotspots = JSON.parse(localStorage.getItem("hotspots")) || [];
+    this.hotspots = loadedHotspots.map((hs) => {
+      const hotspot = new Hotspot(hs.name, hs.animation, hs.data_surface);
+      this.add(hotspot, false);
+      return hotspot;
+    });
+  }
+}
 
   let editMode = false;
   let animNameCreate = [];
@@ -90,6 +115,7 @@
   const enterButton = document.getElementById("enter");
   const cancelButton = document.getElementById("cancel");
   const contextMenu = document.getElementById("contextMenu");
+  const infoForm = document.getElementById("infoForm");
 
   const hotspotCreate = document.getElementById("createHotspot");
   const hotspotRename = document.getElementById("renameHotspot");
@@ -325,23 +351,25 @@
   }
 
   function renameDiv(hotspotElement, hotspotAnnotation) {
+    //, shouldSave = true
     displayBlock(containerInput);
     displayNone(animationNameInput);
-    setupEnterButton(enterButton, ()=>{
+
+    setupEnterButton(enterButton, () => {
       const newName = divNameInput.value.trim();
-      if (newName){
+      if (newName) {
         hotspotAnnotation.textContent = newName;
         hotspotElement.appendChild(hotspotAnnotation);
         const hs = hotspotList.hotspots.find(
           (hs) => hs.animation === hotspotElement.dataset.animation
         );
-        if(hs){
+        if (hs) {
           hs.name = newName;
-          hotspotList.saveHotspots()
+          hotspotList.saveHotspots();
         }
-        outPopup()
+        outPopup();
       }
-    })
+    });
   }
 
   function hightlightHS(hotspotElement) {
@@ -362,20 +390,12 @@
 
   function removeHS(hotspotElement, hotspotDiv) {
     const name = hotspotDiv.textContent;
+
+    hotspotList.hotspots.find((hs) => hs.name === name);
+    // hotspot.removeFromInfoForm();
     hotspotElement.remove();
     hotspotDiv.remove();
     hotspotList.remove(name);
-  }
-
-  async function playAnimation(anim, timeScale) {
-    zarboViewer.animationName = anim;
-    zarboViewer.timeScale = timeScale;
-    await zarboViewer.updateComplete;
-
-    zarboViewer.play({
-      repetitions: 1,
-      pingpong: false,
-    });
   }
 
   function resetHotspotFlags() {
